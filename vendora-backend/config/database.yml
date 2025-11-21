@@ -22,25 +22,9 @@ default: &default
 
 development:
   <<: *default
-  database: postgresql://neondb_owner:npg_ZJia4LRPYd1g@ep-shy-fire-aebenmp6-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-
-  # The specified database role being used to connect to PostgreSQL.
-  # To create additional roles in PostgreSQL see `$ createuser --help`.
-  # When left blank, PostgreSQL will use the default role. This is
-  # the same name as the operating system user running Rails.
-  #username: vendora_backend
-
-  # The password associated with the PostgreSQL role (username).
-  #password:
-
-  # Connect on a TCP socket. Omitted by default since the client uses a
-  # domain socket that doesn't need configuration. Windows does not have
-  # domain sockets, so uncomment these lines.
-  #host: localhost
-
-  # The TCP port the server listens on. Defaults to 5432.
-  # If your server runs on a different port number, change accordingly.
-  #port: 5432
+  # Use full connection URL for Neon PostgreSQL from environment variable
+  # Rails will automatically parse this URL into the appropriate connection parameters
+  url: <%= ENV["DATABASE_URL"] %>
 
   # Schema search path. The server defaults to $user,public
   #schema_search_path: myapp,sharedapp,public
