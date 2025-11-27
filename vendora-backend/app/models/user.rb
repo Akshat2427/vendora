@@ -8,6 +8,8 @@ class User < ApplicationRecord
   has_many :watchlists, dependent: :destroy
   has_many :buyer_payments, class_name: 'Payment', foreign_key: 'buyer_id', dependent: :nullify
   has_many :seller_payments, class_name: 'Payment', foreign_key: 'seller_id', dependent: :nullify
+  has_many :notifications, dependent: :destroy
+  has_one :user_preference, dependent: :destroy
 
   validates :name, presence: true
   validates :email, presence: true, uniqueness: true

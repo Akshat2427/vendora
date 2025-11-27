@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_27_110439) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -83,8 +83,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
     t.decimal "amount", precision: 18, scale: 2, null: false
     t.boolean "is_auto", default: false
     t.decimal "auto_max", precision: 18, scale: 2
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", default: -> { "now()" }, null: false
+    t.datetime "updated_at", default: -> { "now()" }, null: false
     t.index ["auction_item_id", "amount"], name: "idx_bids_item_amount", order: { amount: :desc }
     t.index ["user_id"], name: "index_bids_on_user_id"
   end
@@ -95,10 +95,23 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
     t.integer "parent_id"
     t.text "path"
     t.jsonb "meta", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", default: -> { "now()" }, null: false
+    t.datetime "updated_at", default: -> { "now()" }, null: false
     t.index ["parent_id"], name: "index_categories_on_parent_id"
     t.index ["slug"], name: "index_categories_on_slug", unique: true
+  end
+
+  create_table "faqs", force: :cascade do |t|
+    t.text "category", null: false
+    t.text "question", null: false
+    t.text "answer", null: false
+    t.integer "order", default: 0, null: false
+    t.boolean "is_active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category", "order"], name: "index_faqs_on_category_and_order"
+    t.index ["category"], name: "index_faqs_on_category"
+    t.index ["is_active"], name: "index_faqs_on_is_active"
   end
 
   create_table "forms", force: :cascade do |t|
@@ -110,6 +123,22 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
     t.datetime "updated_at", default: -> { "now()" }, null: false
     t.index ["slug"], name: "index_forms_on_slug", unique: true
     t.index ["tags"], name: "index_forms_on_tags", using: :gin
+  end
+
+  create_table "notifications", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.text "title", null: false
+    t.text "message", null: false
+    t.text "notification_type", null: false
+    t.boolean "seen", default: false, null: false
+    t.text "deeplink"
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["notification_type"], name: "index_notifications_on_notification_type"
+    t.index ["seen"], name: "index_notifications_on_seen"
+    t.index ["user_id", "seen"], name: "index_notifications_on_user_id_and_seen"
+    t.index ["user_id"], name: "index_notifications_on_user_id"
   end
 
   create_table "options", force: :cascade do |t|
@@ -193,6 +222,40 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
     t.index ["tag"], name: "idx_questions_tag", using: :gin
   end
 
+  create_table "settings_fields", force: :cascade do |t|
+    t.bigint "settings_section_id", null: false
+    t.text "field_key", null: false
+    t.text "field_type", null: false
+    t.text "label", null: false
+    t.text "hint"
+    t.text "placeholder"
+    t.jsonb "options", default: []
+    t.text "default_value"
+    t.integer "order", default: 0, null: false
+    t.boolean "required", default: false
+    t.boolean "is_active", default: true, null: false
+    t.text "group_label"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["field_key"], name: "index_settings_fields_on_field_key"
+    t.index ["is_active"], name: "index_settings_fields_on_is_active"
+    t.index ["settings_section_id", "order"], name: "index_settings_fields_on_section_and_order"
+    t.index ["settings_section_id"], name: "index_settings_fields_on_settings_section_id"
+  end
+
+  create_table "settings_sections", force: :cascade do |t|
+    t.text "key", null: false
+    t.text "label", null: false
+    t.text "icon", null: false
+    t.integer "order", default: 0, null: false
+    t.boolean "is_active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["is_active"], name: "index_settings_sections_on_is_active"
+    t.index ["key"], name: "index_settings_sections_on_key", unique: true
+    t.index ["order"], name: "index_settings_sections_on_order"
+  end
+
   create_table "submissions", force: :cascade do |t|
     t.integer "form_id", null: false
     t.bigint "user_id"
@@ -205,6 +268,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
     t.index ["form_id"], name: "idx_submissions_form"
     t.index ["form_id"], name: "index_submissions_on_form_id"
     t.index ["user_id"], name: "idx_submissions_user"
+  end
+
+  create_table "user_preferences", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.jsonb "preferences", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_user_preferences_on_user_id", unique: true
   end
 
   create_table "users", force: :cascade do |t|
@@ -221,6 +292,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
     t.text "display_name"
     t.text "role", default: "buyer"
     t.decimal "rating", precision: 3, scale: 2, default: "0.0"
+    t.date "date_of_birth"
+    t.text "profile_photo_url"
+    t.text "billing_address"
+    t.text "shipping_address"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["username"], name: "index_users_on_username", unique: true
   end
@@ -229,8 +304,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
     t.bigint "user_id", null: false
     t.bigint "auction_id"
     t.bigint "auction_item_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", default: -> { "now()" }, null: false
+    t.datetime "updated_at", default: -> { "now()" }, null: false
     t.index ["auction_id"], name: "index_watchlist_on_auction_id"
     t.index ["auction_item_id"], name: "index_watchlist_on_auction_item_id"
     t.index ["user_id", "auction_id", "auction_item_id"], name: "idx_watchlist_unique", unique: true
@@ -247,6 +322,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
   add_foreign_key "bids", "auction_items", on_delete: :cascade
   add_foreign_key "bids", "users", on_delete: :nullify
   add_foreign_key "categories", "categories", column: "parent_id", on_delete: :nullify
+  add_foreign_key "notifications", "users", on_delete: :cascade
   add_foreign_key "options", "questions", on_delete: :cascade
   add_foreign_key "payments", "auction_items"
   add_foreign_key "payments", "users", column: "buyer_id"
@@ -256,7 +332,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_23_115718) do
   add_foreign_key "products", "users", column: "seller_id", on_delete: :nullify
   add_foreign_key "question_texts", "questions", on_delete: :cascade
   add_foreign_key "questions", "forms", on_delete: :nullify
+  add_foreign_key "settings_fields", "settings_sections", on_delete: :cascade
   add_foreign_key "submissions", "forms", on_delete: :cascade
+  add_foreign_key "user_preferences", "users", on_delete: :cascade
   add_foreign_key "watchlist", "auction_items", on_delete: :cascade
   add_foreign_key "watchlist", "auctions", on_delete: :cascade
   add_foreign_key "watchlist", "users", on_delete: :cascade
