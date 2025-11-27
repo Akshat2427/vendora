@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import { toast } from 'react-hot-toast'
 import { fetchAuctionById } from '../store/slices/auctionSlice'
 import { MdArrowBack, MdCalendarToday, MdAttachMoney, MdPerson, MdStar, MdTrendingUp, MdBarChart } from 'react-icons/md'
+
+const API_BASE = 'http://localhost:5000'
 
 function PlaceBid() {
   const { id } = useParams()
@@ -13,6 +16,7 @@ function PlaceBid() {
 
   const [bidAmount, setBidAmount] = useState('')
   const [selectedItem, setSelectedItem] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const auction = auctions.find((a) => a.id === parseInt(id))
 
@@ -58,11 +62,64 @@ function PlaceBid() {
     }
   }
 
-  const handleBidSubmit = (e) => {
+  const handleBidSubmit = async (e) => {
     e.preventDefault()
-    // TODO: Implement bid submission
-    alert(`Bid of ${formatPrice(bidAmount)} placed successfully!`)
-    setBidAmount('')
+    
+    if (!selectedItem || !currentUser) {
+      toast.error('Please select an item and ensure you are logged in')
+      return
+    }
+
+    const minBid = getMinBid()
+    if (parseFloat(bidAmount) < minBid) {
+      toast.error(`Bid must be at least ${formatPrice(minBid)}`)
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      const response = await fetch(`${API_BASE}/bids`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          bid: {
+            amount: parseFloat(bidAmount),
+            is_auto: false
+          },
+          auction_item_id: selectedItem.id,
+          user_id: currentUser.id
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.errors?.join(', ') || data.error || 'Failed to place bid')
+      }
+
+      // Update the selected item's current price
+      if (data.new_current_price) {
+        setSelectedItem({
+          ...selectedItem,
+          current_price: data.new_current_price
+        })
+      }
+
+      toast.success(`Bid of ${formatPrice(bidAmount)} placed successfully!`)
+      setBidAmount('')
+      
+      // Refresh auction data to get updated information
+      if (id) {
+        dispatch(fetchAuctionById(parseInt(id)))
+      }
+    } catch (error) {
+      toast.error(error.message || 'Failed to place bid. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const getMinBid = () => {
@@ -345,10 +402,10 @@ function PlaceBid() {
 
                   <button
                     type="submit"
-                    disabled={!bidAmount || parseFloat(bidAmount) < getMinBid()}
+                    disabled={!bidAmount || parseFloat(bidAmount) < getMinBid() || submitting}
                     className="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Place Bid
+                    {submitting ? 'Placing Bid...' : 'Place Bid'}
                   </button>
                 </form>
               </div>

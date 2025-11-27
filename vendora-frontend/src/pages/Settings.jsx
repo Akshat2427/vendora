@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { toast } from "react-hot-toast";
 import {
   MdAccountCircle,
   MdSecurity,
@@ -21,8 +23,23 @@ import {
   MdDelete,
 } from "react-icons/md";
 
+const API_BASE = "http://localhost:5000";
+
 export default function Settings() {
+  const { currentUser } = useSelector((state) => state.user);
   const [activeSection, setActiveSection] = useState("account");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [userData, setUserData] = useState({
+    fullName: "",
+    username: "",
+    email: "",
+    phone: "",
+    dateOfBirth: "",
+    profilePhotoUrl: "",
+    billingAddress: "",
+    shippingAddress: "",
+  });
   const [settings, setSettings] = useState({
     // Account Settings
     profilePhoto: "",
@@ -107,21 +124,137 @@ export default function Settings() {
     largerText: false,
   });
 
-  const sections = [
-    { id: "account", label: "Account Settings", icon: MdAccountCircle },
-    { id: "security", label: "Security & Login", icon: MdSecurity },
-    { id: "notifications", label: "Notifications & Alerts", icon: MdNotifications },
-    { id: "buying", label: "Buying & Bidding", icon: MdGavel },
-    { id: "selling", label: "Selling Preferences", icon: MdStore },
-    { id: "payment", label: "Payment & Billing", icon: MdPayment },
-    { id: "privacy", label: "Privacy Settings", icon: MdPrivacyTip },
-    { id: "communication", label: "Communication & Social", icon: MdEmail },
-    { id: "app", label: "App & Interface", icon: MdSettings },
-    { id: "legal", label: "Legal & Compliance", icon: MdLegal },
-  ];
+  // Icon mapping for dynamic icon rendering
+  const iconMap = {
+    MdAccountCircle,
+    MdSecurity,
+    MdNotifications,
+    MdGavel,
+    MdStore,
+    MdPayment,
+    MdPrivacyTip,
+    MdEmail,
+    MdSettings,
+    MdLegal,
+    MdLock,
+    MdDeviceHub,
+    MdVisibility,
+    MdCreditCard,
+    MdLanguage,
+    MdDarkMode,
+    MdPhone,
+  };
+
+  const [sections, setSections] = useState([]);
+  const [loadingSections, setLoadingSections] = useState(true);
+
+  useEffect(() => {
+    fetchSettingsSections();
+    if (currentUser?.id) {
+      fetchSettings();
+    }
+  }, [currentUser?.id]);
+
+  const fetchSettingsSections = async () => {
+    try {
+      setLoadingSections(true);
+      const response = await fetch(`${API_BASE}/settings_sections`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch settings sections");
+      }
+      const data = await response.json();
+      setSections(data.sections || []);
+    } catch (error) {
+      toast.error(error.message || "Failed to load settings sections");
+    } finally {
+      setLoadingSections(false);
+    }
+  };
+
+  const fetchSettings = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/settings/${currentUser.id}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch settings");
+      }
+      const data = await response.json();
+      
+      setUserData({
+        fullName: data.user.name || "",
+        username: data.user.username || "",
+        email: data.user.email || "",
+        phone: data.user.phone || "",
+        dateOfBirth: data.user.date_of_birth || "",
+        profilePhotoUrl: data.user.profile_photo_url || "",
+        billingAddress: data.user.billing_address || "",
+        shippingAddress: data.user.shipping_address || "",
+      });
+      
+      setSettings(data.preferences || {});
+    } catch (error) {
+      toast.error(error.message || "Failed to load settings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      setSaving(true);
+      const response = await fetch(`${API_BASE}/settings/${currentUser.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user: {
+            fullName: userData.fullName,
+            username: userData.username,
+            email: userData.email,
+            phone: userData.phone,
+            date_of_birth: userData.dateOfBirth,
+            profile_photo_url: userData.profilePhotoUrl,
+            billing_address: userData.billingAddress,
+            shipping_address: userData.shippingAddress,
+          },
+          preferences: settings,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.errors?.join(", ") || "Failed to save settings");
+      }
+
+      toast.success("Settings saved successfully");
+    } catch (error) {
+      toast.error(error.message || "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const updateSetting = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
+    // Auto-save after a short delay
+    clearTimeout(window.settingsSaveTimeout);
+    window.settingsSaveTimeout = setTimeout(() => {
+      saveSettings();
+    }, 1000);
+  };
+
+  const updateUserData = (key, value) => {
+    setUserData((prev) => ({ ...prev, [key]: value }));
+    // Auto-save after a short delay
+    clearTimeout(window.settingsSaveTimeout);
+    window.settingsSaveTimeout = setTimeout(() => {
+      saveSettings();
+    }, 1000);
   };
 
   const ToggleRow = ({ label, hint, checked, onChange }) => (
@@ -175,114 +308,148 @@ export default function Settings() {
     </div>
   );
 
-  const renderSection = () => {
-    switch (activeSection) {
-      case "account":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Essential Fields</h3>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Profile Photo</label>
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center">
-                    <MdAccountCircle className="text-4xl text-slate-400" />
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                      Upload
-                    </button>
-                    <button className="px-4 py-2 border border-white/8 text-slate-200 rounded-md hover:bg-white/5">
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <InputField
-                label="Full Name"
-                value={settings.fullName}
-                onChange={(val) => updateSetting("fullName", val)}
-              />
-              <InputField
-                label="Username / Handle"
-                value={settings.username}
-                onChange={(val) => updateSetting("username", val)}
-              />
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="email"
-                    value={settings.email}
-                    onChange={(e) => updateSetting("email", e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-100 focus:ring-2 focus:ring-cyan-400 focus:outline-none"
-                  />
-                  <button className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700">
-                    Change Email
-                  </button>
-                </div>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-300 mb-1">Phone Number</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="tel"
-                    value={settings.phone}
-                    onChange={(e) => updateSetting("phone", e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-100 focus:ring-2 focus:ring-cyan-400 focus:outline-none"
-                  />
-                  <button className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700">
-                    Verify
-                  </button>
-                </div>
-              </div>
-              <InputField
-                label="Date of Birth"
-                type="date"
-                value={settings.dateOfBirth}
-                onChange={(val) => updateSetting("dateOfBirth", val)}
-              />
-              <InputField
-                label="Billing Address"
-                value={settings.billingAddress}
-                onChange={(val) => updateSetting("billingAddress", val)}
-                placeholder="Enter billing address"
-              />
-              <InputField
-                label="Shipping Address"
-                value={settings.shippingAddress}
-                onChange={(val) => updateSetting("shippingAddress", val)}
-                placeholder="Enter shipping address"
-              />
-            </div>
+  const renderField = (field) => {
+    const fieldValue = field.key === "fullName" || field.key === "username" || field.key === "email" || 
+                      field.key === "phone" || field.key === "dateOfBirth" || field.key === "billingAddress" || 
+                      field.key === "shippingAddress"
+      ? userData[field.key === "fullName" ? "fullName" : field.key === "dateOfBirth" ? "dateOfBirth" : 
+         field.key === "billingAddress" ? "billingAddress" : field.key === "shippingAddress" ? "shippingAddress" : 
+         field.key === "email" ? "email" : field.key === "phone" ? "phone" : "username"]
+      : settings[field.key] || field.default_value || "";
 
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Visibility Controls</h3>
-              <ToggleRow
-                label="Public Profile Visibility"
-                hint="Allow others to view your profile"
-                checked={settings.publicProfile}
-                onChange={(val) => updateSetting("publicProfile", val)}
-              />
-              <ToggleRow
-                label="Show Winning History"
-                hint="Display your auction wins publicly"
-                checked={settings.showWinningHistory}
-                onChange={(val) => updateSetting("showWinningHistory", val)}
-              />
-              <ToggleRow
-                label="Show Ratings & Reviews"
-                hint="Display your ratings and reviews"
-                checked={settings.showRatings}
-                onChange={(val) => updateSetting("showRatings", val)}
-              />
-            </div>
+    const handleChange = (value) => {
+      if (field.key === "fullName" || field.key === "username" || field.key === "email" || 
+          field.key === "phone" || field.key === "dateOfBirth" || field.key === "billingAddress" || 
+          field.key === "shippingAddress") {
+        updateUserData(field.key === "fullName" ? "fullName" : field.key === "dateOfBirth" ? "dateOfBirth" : 
+                     field.key === "billingAddress" ? "billingAddress" : field.key === "shippingAddress" ? "shippingAddress" : 
+                     field.key === "email" ? "email" : field.key === "phone" ? "phone" : "username", value);
+      } else {
+        updateSetting(field.key, value);
+      }
+    };
+
+    switch (field.type) {
+      case "toggle":
+        return (
+          <ToggleRow
+            key={field.key}
+            label={field.label}
+            hint={field.hint}
+            checked={fieldValue === true || fieldValue === "true"}
+            onChange={(val) => handleChange(val)}
+          />
+        );
+      case "select":
+        return (
+          <SelectField
+            key={field.key}
+            label={field.label}
+            value={fieldValue}
+            onChange={handleChange}
+            options={field.options || []}
+          />
+        );
+      case "textarea":
+        return (
+          <div key={field.key} className="mb-4">
+            <label className="block text-sm font-medium text-slate-300 mb-1">{field.label}</label>
+            <textarea
+              value={fieldValue}
+              onChange={(e) => handleChange(e.target.value)}
+              placeholder={field.placeholder}
+              rows={4}
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-100 focus:ring-2 focus:ring-cyan-400 focus:outline-none placeholder-slate-500 resize-none"
+            />
           </div>
         );
-
-      case "security":
+      default:
         return (
-          <div className="space-y-6">
+          <InputField
+            key={field.key}
+            label={field.label}
+            type={field.type}
+            value={fieldValue}
+            onChange={handleChange}
+            placeholder={field.placeholder}
+          />
+        );
+    }
+  };
+
+  const renderSection = () => {
+    const currentSection = sections.find((s) => s.id === activeSection);
+    if (!currentSection) return null;
+
+    // Group fields by group_label
+    const groupedFields = {};
+    const ungroupedFields = [];
+
+    currentSection.fields.forEach((field) => {
+      if (field.type === "group") {
+        // This is a group container
+        if (!groupedFields[field.label]) {
+          groupedFields[field.label] = [];
+        }
+        field.fields.forEach((f) => {
+          groupedFields[field.label].push(f);
+        });
+      } else {
+        if (field.group_label) {
+          if (!groupedFields[field.group_label]) {
+            groupedFields[field.group_label] = [];
+          }
+          groupedFields[field.group_label].push(field);
+        } else {
+          ungroupedFields.push(field);
+        }
+      }
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Special handling for account section - Profile Photo */}
+        {activeSection === "account" && (
+          <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Profile Photo</h3>
+            <div className="mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center">
+                  <MdAccountCircle className="text-4xl text-slate-400" />
+                </div>
+                <div className="flex gap-2">
+                  <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                    Upload
+                  </button>
+                  <button className="px-4 py-2 border border-white/8 text-slate-200 rounded-md hover:bg-white/5">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Render ungrouped fields first */}
+        {ungroupedFields.length > 0 && (
+          <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
+            {ungroupedFields.map((field) => renderField(field))}
+          </div>
+        )}
+
+        {/* Render grouped fields */}
+        {Object.entries(groupedFields).map(([groupLabel, fields]) => (
+          <div key={groupLabel} className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">{groupLabel}</h3>
+            <div className="space-y-0">
+              {fields.map((field) => renderField(field))}
+            </div>
+          </div>
+        ))}
+
+        {/* Special sections that need custom rendering */}
+        {activeSection === "security" && (
+          <>
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <MdLock className="text-cyan-400" />
@@ -298,36 +465,8 @@ export default function Settings() {
                     Change
                   </button>
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-white/2 to-white/1 border border-white/4">
-                  <div>
-                    <div className="font-medium">Two-Factor Authentication</div>
-                    <div className="text-sm text-slate-400">Add an extra layer of security</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <SelectField
-                      value={settings.twoFactorMethod}
-                      onChange={(val) => updateSetting("twoFactorMethod", val)}
-                      options={[
-                        { value: "email", label: "Email" },
-                        { value: "sms", label: "SMS" },
-                        { value: "app", label: "Authenticator App" },
-                      ]}
-                    />
-                    <button
-                      className={`px-4 py-2 rounded-md ${
-                        settings.twoFactorEnabled
-                          ? "bg-emerald-600 hover:bg-emerald-700"
-                          : "bg-indigo-600 hover:bg-indigo-700"
-                      } text-white`}
-                      onClick={() => updateSetting("twoFactorEnabled", !settings.twoFactorEnabled)}
-                    >
-                      {settings.twoFactorEnabled ? "Disable" : "Enable"}
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
-
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <MdDeviceHub className="text-cyan-400" />
@@ -350,315 +489,11 @@ export default function Settings() {
                 </button>
               </div>
             </div>
+          </>
+        )}
 
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Safety Controls</h3>
-              <ToggleRow
-                label="Fraud Alerts"
-                hint="Get notified about suspicious activity"
-                checked={settings.fraudAlerts}
-                onChange={(val) => updateSetting("fraudAlerts", val)}
-              />
-              <ToggleRow
-                label="Suspicious Login Notifications"
-                hint="Alert when login from new device/location"
-                checked={settings.suspiciousLoginNotifications}
-                onChange={(val) => updateSetting("suspiciousLoginNotifications", val)}
-              />
-            </div>
-          </div>
-        );
-
-      case "notifications":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <MdEmail className="text-cyan-400" />
-                Email Notifications
-              </h3>
-              <div className="space-y-0">
-                <ToggleRow
-                  label="Outbid Alerts"
-                  checked={settings.emailOutbid}
-                  onChange={(val) => updateSetting("emailOutbid", val)}
-                />
-                <ToggleRow
-                  label="Auction Ending Soon"
-                  checked={settings.emailAuctionEnding}
-                  onChange={(val) => updateSetting("emailAuctionEnding", val)}
-                />
-                <ToggleRow
-                  label="Bid Placed Confirmation"
-                  checked={settings.emailBidPlaced}
-                  onChange={(val) => updateSetting("emailBidPlaced", val)}
-                />
-                <ToggleRow
-                  label="Auction Won"
-                  checked={settings.emailAuctionWon}
-                  onChange={(val) => updateSetting("emailAuctionWon", val)}
-                />
-                <ToggleRow
-                  label="Auction Lost"
-                  checked={settings.emailAuctionLost}
-                  onChange={(val) => updateSetting("emailAuctionLost", val)}
-                />
-                <ToggleRow
-                  label="Watchlist Item Updates"
-                  checked={settings.emailWatchlist}
-                  onChange={(val) => updateSetting("emailWatchlist", val)}
-                />
-                <ToggleRow
-                  label="Payment Reminders"
-                  checked={settings.emailPaymentReminders}
-                  onChange={(val) => updateSetting("emailPaymentReminders", val)}
-                />
-                <ToggleRow
-                  label="Shipping Updates"
-                  checked={settings.emailShipping}
-                  onChange={(val) => updateSetting("emailShipping", val)}
-                />
-                <ToggleRow
-                  label="Seller Responds to Question"
-                  checked={settings.emailSellerResponse}
-                  onChange={(val) => updateSetting("emailSellerResponse", val)}
-                />
-              </div>
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <MdPhone className="text-cyan-400" />
-                SMS / WhatsApp Notifications
-              </h3>
-              <div className="space-y-0">
-                <ToggleRow
-                  label="Outbid Alerts"
-                  checked={settings.smsOutbid}
-                  onChange={(val) => updateSetting("smsOutbid", val)}
-                />
-                <ToggleRow
-                  label="Auction Won"
-                  checked={settings.smsAuctionWon}
-                  onChange={(val) => updateSetting("smsAuctionWon", val)}
-                />
-                <ToggleRow
-                  label="Urgent Platform Announcements"
-                  checked={settings.smsUrgent}
-                  onChange={(val) => updateSetting("smsUrgent", val)}
-                />
-              </div>
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Push Notifications</h3>
-              <div className="space-y-0">
-                <ToggleRow
-                  label="Outbid"
-                  checked={settings.pushOutbid}
-                  onChange={(val) => updateSetting("pushOutbid", val)}
-                />
-                <ToggleRow
-                  label="Auction Ending Soon"
-                  checked={settings.pushAuctionEnding}
-                  onChange={(val) => updateSetting("pushAuctionEnding", val)}
-                />
-                <ToggleRow
-                  label="Item Price Drops"
-                  checked={settings.pushPriceDrops}
-                  onChange={(val) => updateSetting("pushPriceDrops", val)}
-                />
-              </div>
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Frequency Controls</h3>
-              <SelectField
-                label="Notification Frequency"
-                value={settings.notificationFrequency}
-                onChange={(val) => updateSetting("notificationFrequency", val)}
-                options={[
-                  { value: "realtime", label: "Real-time" },
-                  { value: "daily", label: "Daily Digest" },
-                  { value: "weekly", label: "Weekly Summary" },
-                  { value: "important", label: "Only Important Alerts" },
-                ]}
-              />
-            </div>
-          </div>
-        );
-
-      case "buying":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Bid Behavior</h3>
-              <ToggleRow
-                label="Auto-bid"
-                hint="Set maximum bid limit and let the system bid for you"
-                checked={settings.autoBid}
-                onChange={(val) => updateSetting("autoBid", val)}
-              />
-              <ToggleRow
-                label="Bid Confirmation"
-                hint="Confirm before placing a bid"
-                checked={settings.bidConfirmation}
-                onChange={(val) => updateSetting("bidConfirmation", val)}
-              />
-              <ToggleRow
-                label="Quick Bid Toggle"
-                hint="Enable one-click bidding"
-                checked={settings.quickBid}
-                onChange={(val) => updateSetting("quickBid", val)}
-              />
-              <SelectField
-                label="Default Bid Increment Preference"
-                value={settings.defaultBidIncrement}
-                onChange={(val) => updateSetting("defaultBidIncrement", val)}
-                options={[
-                  { value: "1%", label: "1%" },
-                  { value: "5%", label: "5%" },
-                  { value: "10%", label: "10%" },
-                  { value: "custom", label: "Custom" },
-                ]}
-              />
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Buyer Preferences</h3>
-              <SelectField
-                label="Default Payment Method"
-                value={settings.defaultPaymentMethod}
-                onChange={(val) => updateSetting("defaultPaymentMethod", val)}
-                options={[
-                  { value: "card", label: "Credit/Debit Card" },
-                  { value: "upi", label: "UPI" },
-                  { value: "paypal", label: "PayPal" },
-                ]}
-              />
-              <SelectField
-                label="Preferred Shipping Method"
-                value={settings.preferredShipping}
-                onChange={(val) => updateSetting("preferredShipping", val)}
-                options={[
-                  { value: "standard", label: "Standard" },
-                  { value: "express", label: "Express" },
-                  { value: "overnight", label: "Overnight" },
-                ]}
-              />
-              <ToggleRow
-                label="Auto-watchlist"
-                hint="Automatically add all bid items to watchlist"
-                checked={settings.autoWatchlist}
-                onChange={(val) => updateSetting("autoWatchlist", val)}
-              />
-            </div>
-          </div>
-        );
-
-      case "selling":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Store / Seller Info</h3>
-              <InputField
-                label="Store Name"
-                value={settings.storeName}
-                onChange={(val) => updateSetting("storeName", val)}
-              />
-              <InputField
-                label="Business Email"
-                type="email"
-                value={settings.businessEmail}
-                onChange={(val) => updateSetting("businessEmail", val)}
-              />
-              <InputField
-                label="Business Address"
-                value={settings.businessAddress}
-                onChange={(val) => updateSetting("businessAddress", val)}
-              />
-              <InputField
-                label="Return Policy"
-                value={settings.returnPolicy}
-                onChange={(val) => updateSetting("returnPolicy", val)}
-                placeholder="Describe your return policy"
-              />
-              <SelectField
-                label="Shipping Handling Time"
-                value={settings.shippingHandlingTime}
-                onChange={(val) => updateSetting("shippingHandlingTime", val)}
-                options={[
-                  { value: "1-2 days", label: "1-2 days" },
-                  { value: "3-5 days", label: "3-5 days" },
-                  { value: "5-7 days", label: "5-7 days" },
-                  { value: "7+ days", label: "7+ days" },
-                ]}
-              />
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Auction Defaults</h3>
-              <SelectField
-                label="Default Auction Duration"
-                value={settings.defaultAuctionDuration}
-                onChange={(val) => updateSetting("defaultAuctionDuration", val)}
-                options={[
-                  { value: "1 day", label: "1 day" },
-                  { value: "3 days", label: "3 days" },
-                  { value: "7 days", label: "7 days" },
-                  { value: "14 days", label: "14 days" },
-                ]}
-              />
-              <InputField
-                label="Default Starting Bid"
-                type="number"
-                value={settings.defaultStartingBid}
-                onChange={(val) => updateSetting("defaultStartingBid", val)}
-                placeholder="Enter amount"
-              />
-              <ToggleRow
-                label="Automatic Relisting"
-                hint="Automatically relist unsold items"
-                checked={settings.autoRelisting}
-                onChange={(val) => updateSetting("autoRelisting", val)}
-              />
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Seller Tools</h3>
-              <InputField
-                label="Auto-response Message Template"
-                value=""
-                onChange={() => {}}
-                placeholder="Enter template message"
-              />
-              <ToggleRow
-                label="Vacation Mode"
-                hint="Pause all listings temporarily"
-                checked={settings.vacationMode}
-                onChange={(val) => updateSetting("vacationMode", val)}
-              />
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Payment Receiving Account</label>
-                <div className="space-y-2">
-                  <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
-                    Add UPI ID
-                  </button>
-                  <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
-                    Add Bank Account
-                  </button>
-                  <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
-                    Add PayPal
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case "payment":
-        return (
-          <div className="space-y-6">
+        {activeSection === "payment" && (
+          <>
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <MdCreditCard className="text-cyan-400" />
@@ -681,25 +516,9 @@ export default function Settings() {
                   Add Payment Method
                 </button>
               </div>
-              <SelectField
-                label="Set Default Payment Method"
-                value={settings.defaultPaymentMethod}
-                onChange={(val) => updateSetting("defaultPaymentMethod", val)}
-                options={[
-                  { value: "card", label: "Credit/Debit Card" },
-                  { value: "upi", label: "UPI" },
-                  { value: "paypal", label: "PayPal" },
-                ]}
-              />
             </div>
-
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4">Billing</h3>
-              <InputField
-                label="Billing Address"
-                value={settings.billingAddress}
-                onChange={(val) => updateSetting("billingAddress", val)}
-              />
               <div className="mt-4 space-y-2">
                 <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left flex items-center justify-between">
                   <span>Tax Invoices</span>
@@ -711,15 +530,8 @@ export default function Settings() {
                 </button>
               </div>
             </div>
-
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4">Payouts (For Sellers)</h3>
-              <InputField
-                label="GST / VAT Number"
-                value={settings.gstNumber}
-                onChange={(val) => updateSetting("gstNumber", val)}
-                placeholder="Enter GST/VAT number"
-              />
               <div className="mt-4 space-y-2">
                 <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
                   Manage Linked Bank Accounts
@@ -733,224 +545,62 @@ export default function Settings() {
                 </div>
               </div>
             </div>
-          </div>
-        );
+          </>
+        )}
 
-      case "privacy":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <MdVisibility className="text-cyan-400" />
-                Visibility Preferences
-              </h3>
-              <div className="space-y-0">
-                <ToggleRow
-                  label="Show Profile Details"
-                  checked={settings.showProfileDetails}
-                  onChange={(val) => updateSetting("showProfileDetails", val)}
-                />
-                <ToggleRow
-                  label="Show Listings"
-                  checked={settings.showListings}
-                  onChange={(val) => updateSetting("showListings", val)}
-                />
-                <ToggleRow
-                  label="Show Ratings"
-                  checked={settings.showRatingsPrivacy}
-                  onChange={(val) => updateSetting("showRatingsPrivacy", val)}
-                />
-                <ToggleRow
-                  label="Show Bid History"
-                  hint="Privacy mode - hide your bidding activity"
-                  checked={settings.showBidHistory}
-                  onChange={(val) => updateSetting("showBidHistory", val)}
-                />
-              </div>
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Data Controls</h3>
-              <div className="space-y-3">
-                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left flex items-center justify-between">
-                  <span>Download Your Data (GDPR Compliant)</span>
-                  <MdDownload />
-                </button>
-                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left flex items-center justify-between">
-                  <span>Export Purchase History</span>
-                  <MdDownload />
-                </button>
-                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
-                  Request Account Data
-                </button>
-                <button className="w-full px-4 py-2 bg-red-600/20 border border-red-500/30 text-red-400 rounded-md hover:bg-red-600/30 text-left flex items-center justify-between">
-                  <span>Delete Account Request</span>
-                  <MdDelete />
-                </button>
-              </div>
+        {activeSection === "privacy" && (
+          <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Data Controls</h3>
+            <div className="space-y-3">
+              <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left flex items-center justify-between">
+                <span>Download Your Data (GDPR Compliant)</span>
+                <MdDownload />
+              </button>
+              <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left flex items-center justify-between">
+                <span>Export Purchase History</span>
+                <MdDownload />
+              </button>
+              <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
+                Request Account Data
+              </button>
+              <button className="w-full px-4 py-2 bg-red-600/20 border border-red-500/30 text-red-400 rounded-md hover:bg-red-600/30 text-left flex items-center justify-between">
+                <span>Delete Account Request</span>
+                <MdDelete />
+              </button>
             </div>
           </div>
-        );
+        )}
 
-      case "communication":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Connected Accounts</h3>
-              <div className="space-y-3">
-                <div className="p-4 rounded-lg bg-gradient-to-r from-white/2 to-white/1 border border-white/4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                      <span className="text-white font-bold">G</span>
-                    </div>
-                    <div>
-                      <div className="font-medium">Google</div>
-                      <div className="text-sm text-slate-400">Connected</div>
-                    </div>
+        {activeSection === "communication" && (
+          <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Connected Accounts</h3>
+            <div className="space-y-3">
+              <div className="p-4 rounded-lg bg-gradient-to-r from-white/2 to-white/1 border border-white/4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                    <span className="text-white font-bold">G</span>
                   </div>
-                  <button className="px-3 py-1 text-sm border border-white/8 text-slate-200 rounded-md">
-                    Disconnect
-                  </button>
+                  <div>
+                    <div className="font-medium">Google</div>
+                    <div className="text-sm text-slate-400">Connected</div>
+                  </div>
                 </div>
-                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6">
-                  Connect Apple Account
-                </button>
-                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6">
-                  Connect Facebook Account
+                <button className="px-3 py-1 text-sm border border-white/8 text-slate-200 rounded-md">
+                  Disconnect
                 </button>
               </div>
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Marketing & Communications</h3>
-              <div className="space-y-0">
-                <ToggleRow
-                  label="Marketing Emails"
-                  hint="Receive promotional emails and offers"
-                  checked={settings.marketingEmails}
-                  onChange={(val) => updateSetting("marketingEmails", val)}
-                />
-                <ToggleRow
-                  label="Newsletter Subscription"
-                  checked={settings.newsletter}
-                  onChange={(val) => updateSetting("newsletter", val)}
-                />
-                <ToggleRow
-                  label="Promotional Offer Alerts"
-                  checked={settings.promotionalAlerts}
-                  onChange={(val) => updateSetting("promotionalAlerts", val)}
-                />
-                <ToggleRow
-                  label="Partner Ads Visibility"
-                  hint="Show relevant partner advertisements"
-                  checked={settings.partnerAds}
-                  onChange={(val) => updateSetting("partnerAds", val)}
-                />
-              </div>
+              <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6">
+                Connect Apple Account
+              </button>
+              <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6">
+                Connect Facebook Account
+              </button>
             </div>
           </div>
-        );
+        )}
 
-      case "app":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <MdDarkMode className="text-cyan-400" />
-                Themes
-              </h3>
-              <SelectField
-                label="Theme"
-                value={settings.theme}
-                onChange={(val) => updateSetting("theme", val)}
-                options={[
-                  { value: "light", label: "Light" },
-                  { value: "dark", label: "Dark" },
-                  { value: "system", label: "System" },
-                ]}
-              />
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">UI Density</h3>
-              <SelectField
-                label="Interface Density"
-                value={settings.uiDensity}
-                onChange={(val) => updateSetting("uiDensity", val)}
-                options={[
-                  { value: "comfortable", label: "Comfortable" },
-                  { value: "compact", label: "Compact" },
-                ]}
-              />
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <MdLanguage className="text-cyan-400" />
-                Language & Region
-              </h3>
-              <SelectField
-                label="Language"
-                value={settings.language}
-                onChange={(val) => updateSetting("language", val)}
-                options={[
-                  { value: "en", label: "English" },
-                  { value: "es", label: "Spanish" },
-                  { value: "fr", label: "French" },
-                  { value: "de", label: "German" },
-                ]}
-              />
-              <SelectField
-                label="Currency Display"
-                value={settings.currency}
-                onChange={(val) => updateSetting("currency", val)}
-                options={[
-                  { value: "USD", label: "USD ($)" },
-                  { value: "EUR", label: "EUR (€)" },
-                  { value: "GBP", label: "GBP (£)" },
-                  { value: "INR", label: "INR (₹)" },
-                ]}
-              />
-              <SelectField
-                label="Timezone"
-                value={settings.timezone}
-                onChange={(val) => updateSetting("timezone", val)}
-                options={[
-                  { value: "UTC", label: "UTC" },
-                  { value: "EST", label: "EST" },
-                  { value: "PST", label: "PST" },
-                  { value: "IST", label: "IST" },
-                ]}
-              />
-            </div>
-
-            <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
-              <h3 className="text-lg font-semibold mb-4">Accessibility</h3>
-              <div className="space-y-0">
-                <ToggleRow
-                  label="Reduce Motion"
-                  hint="Minimize animations and transitions"
-                  checked={settings.reduceMotion}
-                  onChange={(val) => updateSetting("reduceMotion", val)}
-                />
-                <ToggleRow
-                  label="High Contrast Mode"
-                  checked={settings.highContrast}
-                  onChange={(val) => updateSetting("highContrast", val)}
-                />
-                <ToggleRow
-                  label="Larger Text Mode"
-                  checked={settings.largerText}
-                  onChange={(val) => updateSetting("largerText", val)}
-                />
-              </div>
-            </div>
-          </div>
-        );
-
-      case "legal":
-        return (
-          <div className="space-y-6">
+        {activeSection === "legal" && (
+          <>
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4">Legal Documents</h3>
               <div className="space-y-3">
@@ -965,7 +615,6 @@ export default function Settings() {
                 </button>
               </div>
             </div>
-
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4">Compliance & KYC</h3>
               <div className="space-y-4">
@@ -987,19 +636,42 @@ export default function Settings() {
                 </div>
               </div>
             </div>
-
             <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
               <h3 className="text-lg font-semibold mb-4">Agreement History</h3>
               <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
                 View User Agreement Logs
               </button>
             </div>
-          </div>
-        );
+          </>
+        )}
 
-      default:
-        return null;
-    }
+        {activeSection === "selling" && (
+          <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Seller Tools</h3>
+            <InputField
+              label="Auto-response Message Template"
+              value=""
+              onChange={() => {}}
+              placeholder="Enter template message"
+            />
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-slate-300 mb-2">Payment Receiving Account</label>
+              <div className="space-y-2">
+                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
+                  Add UPI ID
+                </button>
+                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
+                  Add Bank Account
+                </button>
+                <button className="w-full px-4 py-2 bg-white/5 border border-white/8 text-slate-200 rounded-md hover:bg-white/6 text-left">
+                  Add PayPal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -1016,29 +688,50 @@ export default function Settings() {
           <div className="lg:col-span-1">
             <div className="bg-white/6 backdrop-blur-sm rounded-xl border border-white/6 shadow-xl p-4 sticky top-4">
               <nav className="space-y-1">
-                {sections.map((section) => {
-                  const Icon = section.icon;
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                        activeSection === section.id
-                          ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
-                          : "text-slate-300 hover:bg-white/5"
-                      }`}
-                    >
-                      <Icon className="text-xl" />
-                      <span className="text-sm font-medium">{section.label}</span>
-                    </button>
-                  );
-                })}
+                {loadingSections ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-400"></div>
+                  </div>
+                ) : (
+                  sections.map((section) => {
+                    const Icon = iconMap[section.icon] || MdSettings;
+                    return (
+                      <button
+                        key={section.id}
+                        onClick={() => setActiveSection(section.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                          activeSection === section.id
+                            ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
+                            : "text-slate-300 hover:bg-white/5"
+                        }`}
+                      >
+                        <Icon className="text-xl" />
+                        <span className="text-sm font-medium">{section.label}</span>
+                      </button>
+                    );
+                  })
+                )}
               </nav>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3">{renderSection()}</div>
+          <div className="lg:col-span-3">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+              </div>
+            ) : (
+              <>
+                {renderSection()}
+                {saving && (
+                  <div className="fixed bottom-4 right-4 bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg">
+                    Saving...
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

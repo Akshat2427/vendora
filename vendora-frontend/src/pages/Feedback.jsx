@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { toast } from "react-hot-toast";
 import {
   MdFeedback,
   MdHelpOutline,
@@ -9,135 +11,33 @@ import {
   MdStar,
   MdEmail,
   MdPhone,
+  MdHistory,
 } from "react-icons/md";
 
+const API_BASE = "http://localhost:5000";
+
+// Icon mapping for FAQ categories
+const iconMap = {
+  MdHelpOutline: MdHelpOutline,
+  MdQuestionAnswer: MdQuestionAnswer,
+  MdFeedback: MdFeedback,
+};
+
 export default function Feedback() {
+  const { currentUser } = useSelector((state) => state.user);
   const [activeCategory, setActiveCategory] = useState("faq");
   const [expandedFaq, setExpandedFaq] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingFaqs, setLoadingFaqs] = useState(true);
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  const [faqCategories, setFaqCategories] = useState([]);
+  const [userFeedbacks, setUserFeedbacks] = useState([]);
   const [feedbackForm, setFeedbackForm] = useState({
     type: "general",
     subject: "",
     message: "",
     rating: 0,
   });
-
-  const faqCategories = [
-    {
-      id: "getting-started",
-      title: "Getting Started",
-      icon: MdHelpOutline,
-      questions: [
-        {
-          q: "How do I create an account?",
-          a: "Click on the 'Sign Up' button in the top right corner, enter your email address, create a password, and verify your email. You can also sign up using Google, Apple, or Facebook.",
-        },
-        {
-          q: "How do I place a bid?",
-          a: "Browse available auctions, select an item you're interested in, and click 'Place Bid'. Enter your bid amount and confirm. You can also enable auto-bidding to automatically bid up to your maximum limit.",
-        },
-        {
-          q: "What payment methods are accepted?",
-          a: "We accept credit/debit cards, UPI, PayPal, and bank transfers. You can add multiple payment methods in your Settings under Payment & Billing.",
-        },
-        {
-          q: "How does shipping work?",
-          a: "After winning an auction, you'll receive payment instructions. Once payment is confirmed, the seller will ship your item. Shipping times vary by seller and method selected.",
-        },
-      ],
-    },
-    {
-      id: "bidding",
-      title: "Bidding & Auctions",
-      icon: MdQuestionAnswer,
-      questions: [
-        {
-          q: "What is auto-bidding?",
-          a: "Auto-bidding allows you to set a maximum bid amount. The system will automatically bid on your behalf up to that limit, helping you stay competitive without constant monitoring.",
-        },
-        {
-          q: "Can I retract a bid?",
-          a: "Bids are generally final. However, you may retract a bid within 5 minutes of placing it if you made an error. After that, bids cannot be retracted.",
-        },
-        {
-          q: "What happens if I win an auction?",
-          a: "You'll receive an email notification and payment instructions. Complete payment within 48 hours. The seller will then ship your item to the address on file.",
-        },
-        {
-          q: "How do I know if I've been outbid?",
-          a: "You'll receive notifications via email, SMS, or push notifications (based on your preferences) when you're outbid. You can also check your 'My Bids' section.",
-        },
-      ],
-    },
-    {
-      id: "selling",
-      title: "Selling on Vendora",
-      icon: MdFeedback,
-      questions: [
-        {
-          q: "How do I list an item for auction?",
-          a: "Go to 'Sell' in the navigation, click 'Create Listing', upload photos, add a description, set your starting bid and reserve price, choose auction duration, and publish.",
-        },
-        {
-          q: "What fees do sellers pay?",
-          a: "Sellers pay a 10% commission on final sale price, plus payment processing fees. There are no listing fees or monthly subscriptions.",
-        },
-        {
-          q: "When do I receive payment?",
-          a: "Payment is released to your account 3-5 business days after the buyer confirms receipt of the item. You can set up payout methods in Settings.",
-        },
-        {
-          q: "Can I cancel an auction?",
-          a: "You can cancel an auction before any bids are placed. Once bidding starts, you can only end it early if you accept the current highest bid.",
-        },
-      ],
-    },
-    {
-      id: "account",
-      title: "Account & Security",
-      icon: MdHelpOutline,
-      questions: [
-        {
-          q: "How do I change my password?",
-          a: "Go to Settings > Security & Login > Change Password. Enter your current password and create a new one. We recommend using a strong, unique password.",
-        },
-        {
-          q: "How do I enable two-factor authentication?",
-          a: "Navigate to Settings > Security & Login > Two-Factor Authentication. Choose your preferred method (Email, SMS, or Authenticator App) and follow the setup instructions.",
-        },
-        {
-          q: "How do I update my profile information?",
-          a: "You can edit your profile in Settings > Account Settings. Update your name, email, phone, address, and profile photo. Changes are saved immediately.",
-        },
-        {
-          q: "What should I do if I notice suspicious activity?",
-          a: "Immediately change your password and enable 2FA if not already active. Contact our support team and review your login activity in Settings > Security & Login.",
-        },
-      ],
-    },
-    {
-      id: "payments",
-      title: "Payments & Refunds",
-      icon: MdQuestionAnswer,
-      questions: [
-        {
-          q: "How do I add a payment method?",
-          a: "Go to Settings > Payment & Billing > Payment Methods. Click 'Add Payment Method' and enter your card details, UPI ID, or PayPal information.",
-        },
-        {
-          q: "What is your refund policy?",
-          a: "Refunds are handled on a case-by-case basis. If an item doesn't match its description or arrives damaged, contact support within 7 days of delivery for a refund request.",
-        },
-        {
-          q: "How long do refunds take?",
-          a: "Refunds are processed within 5-10 business days after approval. The time may vary depending on your payment method and bank processing times.",
-        },
-        {
-          q: "Are there any transaction fees?",
-          a: "Buyers pay the final bid amount plus shipping. Sellers pay a 10% commission and payment processing fees. All fees are clearly displayed before you commit.",
-        },
-      ],
-    },
-  ];
 
   const feedbackTypes = [
     { value: "general", label: "General Feedback" },
@@ -147,20 +47,116 @@ export default function Feedback() {
     { value: "compliment", label: "Compliment" },
   ];
 
-  const handleSubmitFeedback = (e) => {
+  useEffect(() => {
+    fetchFaqs();
+    if (activeCategory === "your-feedbacks" && currentUser?.id) {
+      fetchUserFeedbacks();
+    }
+  }, [activeCategory, currentUser?.id]);
+
+  const fetchFaqs = async () => {
+    try {
+      setLoadingFaqs(true);
+      const response = await fetch(`${API_BASE}/faqs`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch FAQs");
+      }
+      const data = await response.json();
+      setFaqCategories(data.faq_categories || []);
+    } catch (error) {
+      toast.error(error.message || "Failed to load FAQs");
+    } finally {
+      setLoadingFaqs(false);
+    }
+  };
+
+  const fetchUserFeedbacks = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      setLoadingFeedbacks(true);
+      const response = await fetch(`${API_BASE}/feedback?user_id=${currentUser.id}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch feedbacks");
+      }
+      const data = await response.json();
+      setUserFeedbacks(data.feedbacks || []);
+    } catch (error) {
+      toast.error(error.message || "Failed to load your feedbacks");
+    } finally {
+      setLoadingFeedbacks(false);
+    }
+  };
+
+  const handleSubmitFeedback = async (e) => {
     e.preventDefault();
-    // Handle feedback submission
-    alert("Thank you for your feedback! We'll review it and get back to you soon.");
-    setFeedbackForm({
-      type: "general",
-      subject: "",
-      message: "",
-      rating: 0,
-    });
+
+    if (!feedbackForm.subject.trim() || !feedbackForm.message.trim()) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/feedback/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: feedbackForm.type,
+          subject: feedbackForm.subject,
+          message: feedbackForm.message,
+          rating: feedbackForm.rating,
+          user_id: currentUser?.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.errors?.join(", ") || data.error || "Failed to submit feedback");
+      }
+
+      toast.success(data.message || "Thank you for your feedback! We'll review it and get back to you soon.");
+
+      setFeedbackForm({
+        type: "general",
+        subject: "",
+        message: "",
+        rating: 0,
+      });
+
+      // Refresh user feedbacks if on that tab
+      if (activeCategory === "your-feedbacks") {
+        fetchUserFeedbacks();
+      }
+    } catch (error) {
+      toast.error(error.message || "Failed to submit feedback. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const toggleFaq = (index) => {
     setExpandedFaq(expandedFaq === index ? null : index);
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getFeedbackTypeLabel = (type) => {
+    const feedbackType = feedbackTypes.find((ft) => ft.value === type);
+    return feedbackType ? feedbackType.label : type;
   };
 
   return (
@@ -199,54 +195,140 @@ export default function Feedback() {
                   : "bg-white/6 text-slate-300 hover:bg-white/8"
               }`}
             >
-              <MdFeedback className="inline mr-2" />
+              <MdSend className="inline mr-2" />
               Send Feedback
             </button>
+            {currentUser?.id && (
+              <button
+                onClick={() => setActiveCategory("your-feedbacks")}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  activeCategory === "your-feedbacks"
+                    ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
+                    : "bg-white/6 text-slate-300 hover:bg-white/8"
+                }`}
+              >
+                <MdHistory className="inline mr-2" />
+                Your Feedbacks
+              </button>
+            )}
           </div>
         </div>
 
         {/* FAQ Section */}
         {activeCategory === "faq" && (
           <div className="space-y-6">
-            {faqCategories.map((category) => {
-              const Icon = category.icon;
-              return (
+            {loadingFaqs ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+              </div>
+            ) : faqCategories.length === 0 ? (
+              <div className="bg-white/6 backdrop-blur-sm rounded-xl border border-white/6 shadow-xl p-12 text-center">
+                <MdHelpOutline className="text-6xl text-slate-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No FAQs available</h3>
+                <p className="text-slate-400">Check back later for frequently asked questions.</p>
+              </div>
+            ) : (
+              faqCategories.map((category) => {
+                const Icon = iconMap[category.icon] || MdHelpOutline;
+                return (
+                  <div
+                    key={category.id}
+                    className="bg-white/6 backdrop-blur-sm rounded-xl border border-white/6 shadow-xl p-6"
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <Icon className="text-cyan-400 text-2xl" />
+                      <h2 className="text-xl font-semibold">{category.title}</h2>
+                    </div>
+                    <div className="space-y-3">
+                      {category.questions.map((faq, index) => (
+                        <div
+                          key={index}
+                          className="bg-white/5 rounded-lg border border-white/5 overflow-hidden"
+                        >
+                          <button
+                            onClick={() => toggleFaq(`${category.id}-${index}`)}
+                            className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
+                          >
+                            <span className="font-medium text-slate-200">{faq.q}</span>
+                            {expandedFaq === `${category.id}-${index}` ? (
+                              <MdExpandLess className="text-slate-400 text-xl flex-shrink-0" />
+                            ) : (
+                              <MdExpandMore className="text-slate-400 text-xl flex-shrink-0" />
+                            )}
+                          </button>
+                          {expandedFaq === `${category.id}-${index}` && (
+                            <div className="px-4 pb-4 text-slate-300 text-sm leading-relaxed">
+                              {faq.a}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Your Feedbacks Section */}
+        {activeCategory === "your-feedbacks" && (
+          <div className="space-y-4">
+            {loadingFeedbacks ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+              </div>
+            ) : userFeedbacks.length === 0 ? (
+              <div className="bg-white/6 backdrop-blur-sm rounded-xl border border-white/6 shadow-xl p-12 text-center">
+                <MdFeedback className="text-6xl text-slate-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No feedbacks yet</h3>
+                <p className="text-slate-400 mb-4">You haven't submitted any feedback yet.</p>
+                <button
+                  onClick={() => setActiveCategory("feedback")}
+                  className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-cyan-600 transition-all"
+                >
+                  Submit Your First Feedback
+                </button>
+              </div>
+            ) : (
+              userFeedbacks.map((feedback) => (
                 <div
-                  key={category.id}
+                  key={feedback.id}
                   className="bg-white/6 backdrop-blur-sm rounded-xl border border-white/6 shadow-xl p-6"
                 >
-                  <div className="flex items-center gap-3 mb-4">
-                    <Icon className="text-cyan-400 text-2xl" />
-                    <h2 className="text-xl font-semibold">{category.title}</h2>
-                  </div>
-                  <div className="space-y-3">
-                    {category.questions.map((faq, index) => (
-                      <div
-                        key={index}
-                        className="bg-white/5 rounded-lg border border-white/5 overflow-hidden"
-                      >
-                        <button
-                          onClick={() => toggleFaq(`${category.id}-${index}`)}
-                          className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
-                        >
-                          <span className="font-medium text-slate-200">{faq.q}</span>
-                          {expandedFaq === `${category.id}-${index}` ? (
-                            <MdExpandLess className="text-slate-400 text-xl flex-shrink-0" />
-                          ) : (
-                            <MdExpandMore className="text-slate-400 text-xl flex-shrink-0" />
-                          )}
-                        </button>
-                        {expandedFaq === `${category.id}-${index}` && (
-                          <div className="px-4 pb-4 text-slate-300 text-sm leading-relaxed">
-                            {faq.a}
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-3 py-1 bg-gradient-to-r from-indigo-600/20 to-cyan-500/20 border border-indigo-500/30 rounded-lg text-sm font-medium text-cyan-400">
+                          {getFeedbackTypeLabel(feedback.type)}
+                        </span>
+                        {feedback.rating > 0 && (
+                          <div className="flex items-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <MdStar
+                                key={i}
+                                className={
+                                  i < feedback.rating
+                                    ? "text-yellow-400 fill-yellow-400"
+                                    : "text-slate-500"
+                                }
+                              />
+                            ))}
                           </div>
                         )}
                       </div>
-                    ))}
+                      <h3 className="text-lg font-semibold text-slate-100 mb-1">
+                        {feedback.subject}
+                      </h3>
+                    </div>
+                    <span className="text-xs text-slate-400 whitespace-nowrap ml-4">
+                      {formatDate(feedback.created_at)}
+                    </span>
                   </div>
+                  <p className="text-slate-300 leading-relaxed">{feedback.message}</p>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         )}
 
@@ -334,10 +416,11 @@ export default function Feedback() {
 
                   <button
                     type="submit"
-                    className="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-cyan-600 transition-all flex items-center justify-center gap-2"
+                    disabled={submitting}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-cyan-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <MdSend />
-                    Submit Feedback
+                    {submitting ? "Submitting..." : "Submit Feedback"}
                   </button>
                 </form>
               </div>
@@ -392,4 +475,3 @@ export default function Feedback() {
     </div>
   );
 }
-

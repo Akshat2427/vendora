@@ -9,10 +9,11 @@ import Dashboard from './pages/Dashboard'
 import Feedback from './pages/Feedback'
 import Home from './pages/Home'
 import Notification from './pages/Notification'
-import History from './pages/History'
+import AiChat from './pages/AiChat'
 import Settings from './pages/Settings'
 import AuctionDetails from './pages/AuctionDetails'
 import PlaceBid from './pages/PlaceBid'
+import AuctionCreate from './pages/AuctionCreate'
 
 function App() {
   const dispatch = useDispatch()
@@ -56,8 +57,8 @@ function App() {
             element={isAuthenticated ? <Notification /> : <Navigate to="/home" replace />} 
           />
           <Route 
-            path="/history" 
-            element={isAuthenticated ? <History /> : <Navigate to="/home" replace />} 
+            path="/ai-chat" 
+            element={isAuthenticated ? <AiChat /> : <Navigate to="/home" replace />} 
           />
           <Route 
             path="/settings" 
@@ -70,6 +71,10 @@ function App() {
           <Route 
             path="/auction/:id/bid" 
             element={isAuthenticated ? <PlaceBid /> : <Navigate to="/home" replace />} 
+          />
+          <Route 
+            path="/auction-create" 
+            element={isAuthenticated ? <AuctionCreate /> : <Navigate to="/home" replace />} 
           />
           <Route 
             path="/" 

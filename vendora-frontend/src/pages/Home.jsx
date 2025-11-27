@@ -83,15 +83,26 @@ function Home() {
     <div className="w-full min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-950 text-slate-100 py-10 px-4 sm:px-6 lg:px-8">
       <div className="w-full mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            {currentUser?.role === 'seller' ? 'My Auctions' : 'Available Auctions'}
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            {currentUser?.role === 'seller'
-              ? 'Manage and track your auction listings'
-              : 'Browse and participate in live auctions'}
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+              {currentUser?.role === 'seller' ? 'My Auctions' : 'Available Auctions'}
+            </h1>
+            <p className="text-sm text-slate-400 mt-1">
+              {currentUser?.role === 'seller'
+                ? 'Manage and track your auction listings'
+                : 'Browse and participate in live auctions'}
+            </p>
+          </div>
+          {currentUser?.role === 'seller' && (
+            <button
+              onClick={() => navigate('/auction-create')}
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl hover:from-indigo-700 hover:to-cyan-600 transition-all flex items-center gap-2 font-medium"
+            >
+              <span className="text-xl">+</span>
+              Auction
+            </button>
+          )}
         </div>
 
         {/* User Switcher (for testing) - Moved above cards */}

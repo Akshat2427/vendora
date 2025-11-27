@@ -5,7 +5,7 @@ import {
   MdFeedback, 
   MdHome, 
   MdNotifications, 
-  MdHistory, 
+  MdSmartToy, 
   MdSettings 
 } from 'react-icons/md'
 import MiniRoundMenuBall from '../MiniRoundMenuBall/MiniRoundMenuBall'
@@ -16,7 +16,7 @@ const menuItems = [
   { icon: <MdFeedback key="feedback" />, path: '/feedback' },           // 2. feedback
   { icon: <MdHome key="home" />, path: '/home' },                 // 3. Home
   { icon: <MdNotifications key="notification" />, path: '/notification' }, // 4. notification
-  { icon: <MdHistory key="history" />, path: '/history' },           // 5. history
+  { icon: <MdSmartToy key="ai-chat" />, path: '/ai-chat' },           // 5. AI Chat
   { icon: <MdSettings key="settings" />, path: '/settings' }          // 6. settings
 ]
 
