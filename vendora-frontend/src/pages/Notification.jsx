@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,8 +13,7 @@ import {
   MdArrowBack,
 } from "react-icons/md";
 import { toast } from "react-hot-toast";
-
-const API_BASE = "http://localhost:5000";
+import { apiRequest } from "../services/api";
 
 function Notification() {
   const { currentUser } = useSelector((state) => state.user);
@@ -24,21 +23,15 @@ function Notification() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all"); // all, unread, read
 
-  useEffect(() => {
-    if (currentUser?.id) {
-      fetchNotifications();
-    }
-  }, [currentUser?.id, filter]);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!currentUser?.id) return;
 
     try {
       setLoading(true);
       const seenParam = filter === "unread" ? "false" : filter === "read" ? "true" : null;
-      const url = `${API_BASE}/notifications?user_id=${currentUser.id}${seenParam ? `&seen=${seenParam}` : ""}`;
+      const url = `/notifications?user_id=${currentUser.id}${seenParam ? `&seen=${seenParam}` : ""}`;
 
-      const response = await fetch(url);
+      const response = await apiRequest(url);
       if (!response.ok) {
         throw new Error("Failed to fetch notifications");
       }
@@ -51,11 +44,17 @@ function Notification() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser?.id, filter]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchNotifications();
+    }
+  }, [currentUser?.id, fetchNotifications]);
 
   const markAsSeen = async (notificationId) => {
     try {
-      const response = await fetch(`${API_BASE}/notifications/${notificationId}/mark_seen`, {
+      const response = await apiRequest(`/notifications/${notificationId}/mark_seen`, {
         method: "POST",
       });
 
@@ -79,11 +78,8 @@ function Notification() {
     if (!currentUser?.id) return;
 
     try {
-      const response = await fetch(`${API_BASE}/notifications/mark_all_seen`, {
+      const response = await apiRequest('/notifications/mark_all_seen', {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ user_id: currentUser.id }),
       });
 

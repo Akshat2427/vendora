@@ -1,16 +1,25 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
-import { FiPlus, FiX, FiArrowLeft } from 'react-icons/fi'
-
-const API_BASE = 'http://localhost:5000'
+import { FiPlus, FiX, FiArrowLeft, FiSearch, FiZap } from 'react-icons/fi'
+import { apiRequest } from '../services/api'
 
 function AuctionCreate() {
   const navigate = useNavigate()
   const { currentUser } = useSelector((state) => state.user)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  
+  // Product search state
+  const [searchQueries, setSearchQueries] = useState({}) // { productIndex: query }
+  const [searchResults, setSearchResults] = useState({}) // { productIndex: results }
+  const [showDropdown, setShowDropdown] = useState({}) // { productIndex: boolean }
+  const [searchLoading, setSearchLoading] = useState({}) // { productIndex: boolean }
+  const [priceSuggestions, setPriceSuggestions] = useState({}) // { productIndex: suggestion }
+  const [suggestingPrice, setSuggestingPrice] = useState({}) // { productIndex: boolean }
+  const searchTimeoutRefs = useRef({})
+  const dropdownRefs = useRef({})
 
   const [formData, setFormData] = useState({
     name: '',
@@ -59,7 +68,110 @@ function AuctionCreate() {
     const updatedProducts = [...formData.products]
     updatedProducts[index][field] = value
     setFormData({ ...formData, products: updatedProducts })
+    
+    // If product name changed, trigger search
+    if (field === 'name' && value.length >= 2) {
+      handleProductSearch(index, value)
+    } else if (field === 'name' && value.length < 2) {
+      // Clear search results if query is too short
+      setSearchResults(prev => ({ ...prev, [index]: [] }))
+      setShowDropdown(prev => ({ ...prev, [index]: false }))
+    }
   }
+
+  // Throttled product search
+  const handleProductSearch = (index, query) => {
+    // Clear previous timeout
+    if (searchTimeoutRefs.current[index]) {
+      clearTimeout(searchTimeoutRefs.current[index])
+    }
+
+    // Set search query
+    setSearchQueries(prev => ({ ...prev, [index]: query }))
+    setSearchLoading(prev => ({ ...prev, [index]: true }))
+
+    // Throttle: wait 500ms after user stops typing
+    searchTimeoutRefs.current[index] = setTimeout(async () => {
+      try {
+        const response = await apiRequest(`/products/search?q=${encodeURIComponent(query)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setSearchResults(prev => ({ ...prev, [index]: data.products || [] }))
+          setShowDropdown(prev => ({ ...prev, [index]: true }))
+        }
+      } catch (err) {
+        console.error('Search error:', err)
+        setSearchResults(prev => ({ ...prev, [index]: [] }))
+      } finally {
+        setSearchLoading(prev => ({ ...prev, [index]: false }))
+      }
+    }, 500)
+  }
+
+  // Select a product from search results
+  const selectProduct = async (index, product) => {
+    const updatedProducts = [...formData.products]
+    updatedProducts[index].name = product.name
+    updatedProducts[index].description = product.description || ''
+    updatedProducts[index].category = product.category || ''
+    
+    setFormData({ ...formData, products: updatedProducts })
+    setShowDropdown(prev => ({ ...prev, [index]: false }))
+    setSearchResults(prev => ({ ...prev, [index]: [] }))
+    
+    // Get AI price suggestion
+    await getPriceSuggestion(index, product.name)
+  }
+
+  // Get AI price suggestion for selected product
+  const getPriceSuggestion = async (index, productName) => {
+    if (!productName || productName.trim().length < 2) return
+
+    setSuggestingPrice(prev => ({ ...prev, [index]: true }))
+    
+    try {
+      const response = await apiRequest('/products/suggest_price', {
+        method: 'POST',
+        body: JSON.stringify({ product_name: productName })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPriceSuggestions(prev => ({ ...prev, [index]: data }))
+        
+        // Auto-fill suggested prices
+        const updatedProducts = [...formData.products]
+        if (data.price_range) {
+          updatedProducts[index].starting_price = data.price_range.suggested_starting || ''
+          updatedProducts[index].reserve_price = data.price_range.suggested_reserve || ''
+          updatedProducts[index].ai_suggested_price = 
+            `₹${data.price_range.min} - ₹${data.price_range.max} (Avg: ₹${data.price_range.average})`
+        }
+        setFormData({ ...formData, products: updatedProducts })
+      }
+    } catch (err) {
+      console.error('Price suggestion error:', err)
+      const updatedProducts = [...formData.products]
+      updatedProducts[index].ai_suggested_price = 'Unable to fetch price suggestion'
+      setFormData({ ...formData, products: updatedProducts })
+    } finally {
+      setSuggestingPrice(prev => ({ ...prev, [index]: false }))
+    }
+  }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      Object.keys(dropdownRefs.current).forEach(index => {
+        if (dropdownRefs.current[index] && !dropdownRefs.current[index].contains(event.target)) {
+          setShowDropdown(prev => ({ ...prev, [index]: false }))
+        }
+      })
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -87,11 +199,8 @@ function AuctionCreate() {
         }))
       }
 
-      const response = await fetch(`${API_BASE}/auctions/create_with_products`, {
+      const response = await apiRequest('/auctions/create_with_products', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(payload)
       })
 
@@ -240,18 +349,58 @@ function AuctionCreate() {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-slate-300 mb-1">
                       Product Name *
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={product.name}
-                      onChange={(e) => updateProduct(index, 'name', e.target.value)}
-                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-100 focus:ring-2 focus:ring-cyan-400 focus:outline-none"
-                      placeholder="Enter product name"
-                    />
+                    <div className="relative">
+                      <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        value={product.name}
+                        onChange={(e) => updateProduct(index, 'name', e.target.value)}
+                        onFocus={() => {
+                          if (searchResults[index]?.length > 0) {
+                            setShowDropdown(prev => ({ ...prev, [index]: true }))
+                          }
+                        }}
+                        className="w-full pl-10 pr-4 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-100 focus:ring-2 focus:ring-cyan-400 focus:outline-none"
+                        placeholder="Search or enter product name"
+                      />
+                      {searchLoading[index] && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-400"></div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Search Results Dropdown */}
+                    {showDropdown[index] && searchResults[index]?.length > 0 && (
+                      <div
+                        ref={el => dropdownRefs.current[index] = el}
+                        className="absolute z-10 w-full mt-1 bg-slate-800 border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                      >
+                        {searchResults[index].map((result) => (
+                          <button
+                            key={result.id}
+                            type="button"
+                            onClick={() => selectProduct(index, result)}
+                            className="w-full px-4 py-3 text-left hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0"
+                          >
+                            <div className="font-medium text-slate-200">{result.name}</div>
+                            {result.description && (
+                              <div className="text-sm text-slate-400 mt-1 line-clamp-1">
+                                {result.description}
+                              </div>
+                            )}
+                            {result.category && (
+                              <div className="text-xs text-cyan-400 mt-1">{result.category}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -314,8 +463,12 @@ function AuctionCreate() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                      <label className="block text-sm font-medium text-slate-300 mb-1 flex items-center gap-2">
+                        <FiZap className="text-cyan-400" />
                         AI Suggested Price
+                        {suggestingPrice[index] && (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-cyan-400"></div>
+                        )}
                       </label>
                       <input
                         type="text"
@@ -323,6 +476,27 @@ function AuctionCreate() {
                         value={product.ai_suggested_price}
                         className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/8 text-slate-400 cursor-not-allowed"
                       />
+                      {priceSuggestions[index] && (
+                        <div className="mt-2 p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                          <p className="text-xs text-cyan-400 mb-1">
+                            {priceSuggestions[index].source === 'auction_history' 
+                              ? '📊 Based on successful auctions' 
+                              : '🤖 AI market research'}
+                          </p>
+                          {priceSuggestions[index].price_range && (
+                            <div className="text-xs text-slate-300 space-y-1">
+                              <div>Min: ₹{priceSuggestions[index].price_range.min}</div>
+                              <div>Max: ₹{priceSuggestions[index].price_range.max}</div>
+                              <div>Avg: ₹{priceSuggestions[index].price_range.average}</div>
+                            </div>
+                          )}
+                          {priceSuggestions[index].message && (
+                            <p className="text-xs text-slate-400 mt-2">
+                              {priceSuggestions[index].message}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -13,8 +13,7 @@ import {
   MdPhone,
   MdHistory,
 } from "react-icons/md";
-
-const API_BASE = "http://localhost:5000";
+import { apiRequest } from "../services/api";
 
 // Icon mapping for FAQ categories
 const iconMap = {
@@ -57,7 +56,7 @@ export default function Feedback() {
   const fetchFaqs = async () => {
     try {
       setLoadingFaqs(true);
-      const response = await fetch(`${API_BASE}/faqs`);
+      const response = await apiRequest('/faqs');
       if (!response.ok) {
         throw new Error("Failed to fetch FAQs");
       }
@@ -75,7 +74,7 @@ export default function Feedback() {
 
     try {
       setLoadingFeedbacks(true);
-      const response = await fetch(`${API_BASE}/feedback?user_id=${currentUser.id}`);
+      const response = await apiRequest(`/feedback?user_id=${currentUser.id}`);
       if (!response.ok) {
         throw new Error("Failed to fetch feedbacks");
       }
@@ -99,11 +98,8 @@ export default function Feedback() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE}/feedback/submit`, {
+      const response = await apiRequest('/feedback/submit', {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           type: feedbackForm.type,
           subject: feedbackForm.subject,

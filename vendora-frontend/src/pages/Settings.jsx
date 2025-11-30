@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { logoutUser } from "../store/slices/userSlice";
 import { toast } from "react-hot-toast";
+import { apiRequest } from "../services/api";
 import {
   MdAccountCircle,
   MdSecurity,
@@ -23,9 +26,10 @@ import {
   MdDelete,
 } from "react-icons/md";
 
-const API_BASE = "http://localhost:5000";
 
 export default function Settings() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { currentUser } = useSelector((state) => state.user);
   const [activeSection, setActiveSection] = useState("account");
   const [loading, setLoading] = useState(true);
@@ -158,7 +162,7 @@ export default function Settings() {
   const fetchSettingsSections = async () => {
     try {
       setLoadingSections(true);
-      const response = await fetch(`${API_BASE}/settings_sections`);
+      const response = await apiRequest('/settings_sections');
       if (!response.ok) {
         throw new Error("Failed to fetch settings sections");
       }
@@ -176,7 +180,7 @@ export default function Settings() {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/settings/${currentUser.id}`);
+      const response = await apiRequest(`/settings/${currentUser.id}`);
       if (!response.ok) {
         throw new Error("Failed to fetch settings");
       }
@@ -206,11 +210,8 @@ export default function Settings() {
 
     try {
       setSaving(true);
-      const response = await fetch(`${API_BASE}/settings/${currentUser.id}`, {
+      const response = await apiRequest(`/settings/${currentUser.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           user: {
             fullName: userData.fullName,
@@ -446,6 +447,27 @@ export default function Settings() {
             </div>
           </div>
         ))}
+
+        {/* Logout button in account section */}
+        {activeSection === "account" && (
+          <div className="bg-white/6 backdrop-blur-sm p-6 rounded-xl border border-white/6 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Account Actions</h3>
+            <button
+              onClick={async () => {
+                try {
+                  await dispatch(logoutUser()).unwrap();
+                  toast.success("Logged out successfully");
+                  navigate("/login");
+                } catch {
+                  toast.error("Failed to logout");
+                }
+              }}
+              className="w-full px-4 py-3 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-all font-medium"
+            >
+              Logout
+            </button>
+          </div>
+        )}
 
         {/* Special sections that need custom rendering */}
         {activeSection === "security" && (

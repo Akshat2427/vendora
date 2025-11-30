@@ -31,8 +31,7 @@ import {
   FiX,
   FiPlus
 } from 'react-icons/fi'
-
-const API_BASE = 'http://localhost:5000'
+import { apiRequest } from '../services/api'
 
 const COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981']
 
@@ -81,14 +80,14 @@ function Dashboard() {
       })
 
       const [kpisRes, bidsRes, topProductsRes, productCountRes, marketTrendsRes, topAuctionsRes, recentBidsRes, tableRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/analytics/kpis?${params}`),
-        fetch(`${API_BASE}/analytics/bids_over_time?${params}&interval=hour`),
-        fetch(`${API_BASE}/analytics/top_products?${params}&limit=5`),
-        fetch(`${API_BASE}/analytics/product_count?${params}`),
-        fetch(`${API_BASE}/analytics/market_trends?${params}`),
-        fetch(`${API_BASE}/analytics/top_auctions?${params}&limit=5`),
-        fetch(`${API_BASE}/analytics/recent_bids?${params}&limit=10`),
-        fetch(`${API_BASE}/analytics/auction_table?${params}`)
+        apiRequest(`/analytics/kpis?${params}`),
+        apiRequest(`/analytics/bids_over_time?${params}&interval=hour`),
+        apiRequest(`/analytics/top_products?${params}&limit=5`),
+        apiRequest(`/analytics/product_count?${params}`),
+        apiRequest(`/analytics/market_trends?${params}`),
+        apiRequest(`/analytics/top_auctions?${params}&limit=5`),
+        apiRequest(`/analytics/recent_bids?${params}&limit=10`),
+        apiRequest(`/analytics/auction_table?${params}`)
       ])
 
       const parseResponse = async (result, defaultValue) => {

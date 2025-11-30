@@ -2,8 +2,6 @@ import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { fetchAuctionById } from '../store/slices/auctionSlice'
-import { setUser } from '../store/slices/userSlice'
-import usersData from '../data/users.json'
 
 function Home() {
   const navigate = useNavigate()
@@ -11,20 +9,12 @@ function Home() {
   const { currentUser } = useSelector((state) => state.user)
   const { auctions, loading, error } = useSelector((state) => state.auctions)
 
-  // User initialization is now handled in App.jsx
-
-  // Fetch auctions based on user role
+  // Fetch auctions for current user
   useEffect(() => {
-    if (currentUser) {
-      if (currentUser.role === 'seller') {
-        // Seller sees their auction (ID: 3)
-        dispatch(fetchAuctionById(3))
-      } else if (currentUser.role === 'buyer') {
-        // Buyer sees auctions they can participate in (ID: 2)
-        dispatch(fetchAuctionById(2))
-      }
+    if (currentUser?.id) {
+      dispatch(fetchAuctionById(currentUser.id))
     }
-  }, [currentUser, dispatch])
+  }, [currentUser?.id, dispatch])
 
   const formatDate = (dateString) => {
     const date = new Date(dateString)
@@ -103,26 +93,6 @@ function Home() {
               Auction
             </button>
           )}
-        </div>
-
-        {/* User Switcher (for testing) - Moved above cards */}
-        <div className="mb-6 p-4 bg-white/6 backdrop-blur-sm rounded-xl border border-white/6 shadow-xl">
-          <p className="text-sm font-semibold text-slate-300 mb-3">Switch User (Testing)</p>
-          <div className="flex flex-wrap gap-2">
-            {usersData.map((user) => (
-              <button
-                key={user.id}
-                onClick={() => dispatch(setUser(user))}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  currentUser?.id === user.id
-                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-500 text-white'
-                    : 'bg-white/6 text-slate-300 hover:bg-white/8'
-                }`}
-              >
-                {user.display_name} ({user.role})
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Auction Cards - Horizontal Layout */}

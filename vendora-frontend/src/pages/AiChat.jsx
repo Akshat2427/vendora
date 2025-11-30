@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MdSend, MdSmartToy } from 'react-icons/md'
 import { toast } from 'react-hot-toast'
-
-const API_BASE = 'http://localhost:5000'
+import { apiRequest } from '../services/api'
 
 function AiChat() {
   const [messages, setMessages] = useState([
@@ -48,11 +47,8 @@ function AiChat() {
         text: msg.text
       }))
 
-      const response = await fetch(`${API_BASE}/ai_chat/chat`, {
+      const response = await apiRequest('/ai_chat/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           message: userMessage.text,
           conversation_history: conversationHistory

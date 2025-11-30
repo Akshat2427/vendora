@@ -1,11 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
+import { apiRequest } from '../../services/api'
 
 // Async thunk to fetch auction by ID
 export const fetchAuctionById = createAsyncThunk(
   'auctions/fetchById',
   async (auctionId, { rejectWithValue }) => {
     try {
-      const response = await fetch(`http://localhost:5000/auctions/${auctionId}`)
+      const response = await apiRequest(`/auctions/${auctionId}`)
       if (!response.ok) {
         throw new Error('Failed to fetch auction')
       }

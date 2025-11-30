@@ -4,8 +4,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { toast } from 'react-hot-toast'
 import { fetchAuctionById } from '../store/slices/auctionSlice'
 import { MdArrowBack, MdCalendarToday, MdAttachMoney, MdPerson, MdStar, MdTrendingUp, MdBarChart } from 'react-icons/md'
-
-const API_BASE = 'http://localhost:5000'
+import { apiRequest } from '../services/api'
 
 function PlaceBid() {
   const { id } = useParams()
@@ -79,11 +78,8 @@ function PlaceBid() {
     setSubmitting(true)
 
     try {
-      const response = await fetch(`${API_BASE}/bids`, {
+      const response = await apiRequest('/bids', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           bid: {
             amount: parseFloat(bidAmount),
