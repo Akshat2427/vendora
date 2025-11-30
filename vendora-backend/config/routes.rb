@@ -1,29 +1,41 @@
 Rails.application.routes.draw do
+  # Authentication routes
+  post "auth/signup", to: "authentication#signup"
+  post "auth/login", to: "authentication#login"
+  post "auth/logout", to: "authentication#logout"
+  get "auth/me", to: "authentication#me"
+
   resources :users, only: [ :index, :create ]
   resources :forms
   resources :submissions
   resources :auctions do
     collection do
-      post 'create_with_products', to: 'auctions#create_with_products'
+      post "create_with_products", to: "auctions#create_with_products"
     end
   end
-  resources :bids, only: [:create]
-  post 'ai_chat/chat', to: 'ai_chat#chat'
-  get 'feedback', to: 'feedback#index'
-  post 'feedback/submit', to: 'feedback#submit'
-  resources :notifications, only: [:index, :show] do
+  resources :bids, only: [ :create ]
+  resources :products, only: [] do
+    collection do
+      get "search", to: "products#search"
+      post "suggest_price", to: "products#suggest_price"
+    end
+  end
+  post "ai_chat/chat", to: "ai_chat#chat"
+  get "feedback", to: "feedback#index"
+  post "feedback/submit", to: "feedback#submit"
+  resources :notifications, only: [ :index, :show ] do
     member do
-      post 'mark_seen', to: 'notifications#mark_seen'
+      post "mark_seen", to: "notifications#mark_seen"
     end
     collection do
-      post 'mark_all_seen', to: 'notifications#mark_all_seen'
+      post "mark_all_seen", to: "notifications#mark_all_seen"
     end
   end
-  resources :faqs, only: [:index, :show]
-  get 'settings/:user_id', to: 'settings#show'
-  put 'settings/:user_id', to: 'settings#update'
-  patch 'settings/:user_id', to: 'settings#update'
-  resources :settings_sections, only: [:index, :show]
+  resources :faqs, only: [ :index, :show ]
+  get "settings/:user_id", to: "settings#show"
+  put "settings/:user_id", to: "settings#update"
+  patch "settings/:user_id", to: "settings#update"
+  resources :settings_sections, only: [ :index, :show ]
   get "hello_world", to: "hello_world#index"
 
   # Analytics routes

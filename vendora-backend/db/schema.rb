@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_27_110439) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_30_090742) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -123,6 +123,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_27_110439) do
     t.datetime "updated_at", default: -> { "now()" }, null: false
     t.index ["slug"], name: "index_forms_on_slug", unique: true
     t.index ["tags"], name: "index_forms_on_tags", using: :gin
+  end
+
+  create_table "jwt_blacklists", force: :cascade do |t|
+    t.string "jti"
+    t.datetime "expires_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["jti"], name: "index_jwt_blacklists_on_jti"
   end
 
   create_table "notifications", force: :cascade do |t|
@@ -296,6 +304,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_27_110439) do
     t.text "profile_photo_url"
     t.text "billing_address"
     t.text "shipping_address"
+    t.string "password_digest"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["username"], name: "index_users_on_username", unique: true
   end
